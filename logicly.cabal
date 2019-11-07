@@ -5,17 +5,31 @@ cabal-version:       >=1.10
 
 name:                logicly
 version:             0.1.0.0
--- synopsis:
--- description:
+synopsis:            Evaluation and creation of truth tables for loglic expressions
+description:
+    This package contains the application called logicly that 
+    can be used to create a truth table for aa given logicle expressions.
+    The truth-table can be filtered for the valuations with satisfies or 
+    does not satisfies the expession.
+    The application can also be used to evaluate a specific valuation with 
+    the expression.
 -- bug-reports:
--- license:
+license:             GPL-3
 license-file:        LICENSE
-author:              Timo Weike
-maintainer:          tweike@techfak.uni-bielefeld.de
--- copyright:
--- category:
+author:              Timo Weike <timo_weike@gmx.de>
+maintainer:          Timo Weike <timo_weike@gmx.de>
+copyright:           Copyright (c) 2019 Timo Weike
+category:
+    Application,
+    Logic,
+    CLI Tool
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
+Homepage:               https://gitlab.com/Timo.Weike/logicly
+
+Source-Repository head
+  type: git
+  location: https://gitlab.com/Timo.Weike/logicly
 
 test-suite test
     type:               exitcode-stdio-1.0
@@ -57,7 +71,7 @@ executable logicly
         
     -- other-extensions:
     build-depends:       
-        base >=4.12,
+        base >=4.12 && <4.13,
         parsec >=3.1.13.0,
         containers >=0.6.2.1,
         boxes >=0.1.5,
