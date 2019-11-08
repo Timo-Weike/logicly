@@ -11,19 +11,12 @@ module LogicExp.Valuation
 where
 
 import qualified Data.Map.Strict as M
-import LogicExp
 import LogicExp.Parse (reservedChar)
+import BaseExt
 
 -- import for parsing
 import           Text.Parsec hiding (parse)
 import qualified Text.Parsec   as P (parse)
-import Text.Parsec.Char
-import Data.Either
-import Data.Bifunctor
-import Data.Maybe
-
-a |> f = f a
-withDefault = fromMaybe
 
 type Map = M.Map Char Bool
 type Valuation = Map
@@ -66,5 +59,7 @@ parseValuation str = x
             Left s  -> Left $ show s
             Right list -> Right $ M.fromList list
 
+readBool :: Char -> Bool
 readBool '0' = False
 readBool '1' = True
+readBool c   = error $ "Can not convert " ++ show c ++ " to a boolean"
