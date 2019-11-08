@@ -7,19 +7,12 @@ where
 import Data.List
 import Text.PrettyPrint.Boxes
 
-data Table a b c = T {
-        colHeader :: Maybe [a]
-        , rowHeader :: Maybe [b]
-        , rows :: Maybe [[c]]
-    }
-
-
 headerAndContentToTable :: [String] -> [[String]] -> String
-headerAndContentToTable h con = render $ hsep 0 top $ putHeader <$> h_and_con_t
+headerAndContentToTable header con = render $ hsep 0 top $ putHeader <$> h_and_con_t
     where
         con_t = transpose con
         boxed_content = vcat center2 . (text <$>) <$> con_t
-        h_and_con_t = intersperse ("", emptyBox 1 1) $ zip h boxed_content
+        h_and_con_t = intersperse ("", emptyBox 1 1) $ zip header boxed_content
 
         putHeader :: (String, Box) -> Box
         putHeader (h, box) = vcat center1 [h_box, sep_box, box]

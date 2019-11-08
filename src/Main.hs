@@ -1,9 +1,7 @@
--- {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Data.Either
 import Control.Monad
-import Data.Char
 import Data.List
 import System.Console.GetOpt
 import System.Environment
@@ -12,21 +10,12 @@ import System.IO
 import Text.Printf
 import Data.Functor
 import Data.Maybe
-import Text.PrettyPrint.Boxes
+import Prelude hiding (exp)
 
-import BaseExt
 import LogicExp
 import LogicExp.Valuation
 import LogicExp.Eval
 import Text.Table
-
-data Flags =
-    Table
-    | Eval String
-    | Help
-    | OnlySat
-    | OnlyUnsat
-    deriving (Show, Read, Eq, Ord)
 
 data Configuration = C {
     showTable :: Bool,
@@ -36,6 +25,7 @@ data Configuration = C {
     onlyUnsat :: Bool
 } deriving (Show, Eq)
 
+emptyConfiguration :: Configuration
 emptyConfiguration = C False False Nothing False False
 
 options :: [OptDescr (Configuration -> IO Configuration)]
@@ -68,14 +58,14 @@ setHelpFlag s =
         return $ s { showHelp = True }
 
 setEvalFlag :: String ->  Configuration -> IO Configuration
-setEvalFlag arg s = 
-    if isJust $ valuation s then
+setEvalFlag arg config = 
+    if isJust $ valuation config then
         reportError "cannot handle multiple valuations"
     else do
         val <- case parseValuation arg of
                 Left s -> reportError s
                 Right v -> pure v
-        return $ s { valuation = Just val }
+        return $ config { valuation = Just val }
 
 
 setOnlySatFlag :: Configuration -> IO Configuration
@@ -92,22 +82,18 @@ setOnlyUnsatFlag s =
     else
         return $ s { onlyUnsat = True }
 
-areArgsValid args = True
-
 parseArgs :: IO (Configuration, String)
 parseArgs = do
     args <- getArgs
 
     -- Parse options, getting a list of option actions
     case getOpt RequireOrder options args of
-        (args,exps,[]) -> do
+        (config,exps,[]) -> do
             -- Here we thread startOptions through all supplied option actions
-            opts <- foldl (>>=) (return emptyConfiguration) args 
+            opts <- foldl (>>=) (return emptyConfiguration) config 
             return (opts, concat exps)
         
-        (_,_,err) -> do
-            reportError $ concat err
-            return $ error ""
+        (_,_,err) -> reportError $ concat err
                 
 reportError :: String -> IO a
 reportError s = do
@@ -201,7 +187,7 @@ header :: String
 header = "Usage: logic-tool [-the] [EXP]\n"
 
 body :: String
-body = unlines 
+body = intercalate "\n" 
     [
           ""
         , "Expression syntax:"
@@ -227,4 +213,8 @@ body = unlines
         , "    'logicly \"a & x\"' is not valid because 'x' will be interpreted as xor, but"
         , "    'logicly \"a and b\" is fine because the 'a' can't be mistaken for an operation"
         , "    and the 'and' can't be mistaken for a list of literals"
+        , ""
+        , "The valuation for the flag 'e' has to be of the form:"
+        , "    <lit>:(0|1)(,<lit>:(0|1))*"
+        , "so for example the call 'logicly -e \"a:0,b:1\" \"a and b\" would generate: False"
     ]

@@ -10,22 +10,16 @@ module LogicExp
     )
 where
 
-import           Text.Parsec hiding (parse)
-import qualified Text.Parsec   as P (parse)
-import Text.Parsec.Char
-import Data.Either
-import Data.Bifunctor
-import LogicExp.Priority
+import Prelude hiding (exp)
 import Data.List
 
 import qualified LogicExp.Parse as LP
 import LogicExp.Core
-import BaseExt
 
-
-
+unSafeParseExp :: String -> LogicExp
 unSafeParseExp s = either (error . show) id (parse s)
 
+parse :: String -> Either String LogicExp
 parse = LP.parse
 
 toString :: LogicExp -> String
@@ -40,7 +34,7 @@ toString (Xor   a b) = "(" ++ toString a ++ " x "   ++ toString b ++ ")"
 toString (Not a)     = "~" ++ toString a
 
 getLiteralList :: LogicExp -> String
-getLiteralList a = sort $ nub $ getLiteralList' a
+getLiteralList exp = sort $ nub $ getLiteralList' exp
     where
         getLiteralList' (Lit c)     = [c]
         getLiteralList' T           = []
@@ -54,7 +48,9 @@ getLiteralList a = sort $ nub $ getLiteralList' a
 
 partialFormulas :: LogicExp -> [LogicExp]
 partialFormulas (Lit c) = [Lit c]
-partialFormulas e       = pf e
+partialFormulas T       = [T]
+partialFormulas F       = [F]
+partialFormulas exp     = pf exp
     where
         pf (Lit _)       = []
         pf T             = []
@@ -65,5 +61,3 @@ partialFormulas e       = pf e
         pf e@(Xor   a b) = e : (pf a ++ pf b)
         pf e@(Imp   a b) = e : (pf a ++ pf b)
         pf e@(Equal a b) = e : (pf a ++ pf b)
-
--------------------------------

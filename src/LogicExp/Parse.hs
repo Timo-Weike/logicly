@@ -6,15 +6,12 @@ module LogicExp.Parse
         )
 where
 
+import Prelude hiding (not, or, and, exp)
 import           Text.Parsec hiding (parse)
 import qualified Text.Parsec   as P (parse)
-import Text.Parsec.Char
-import Data.Either
 import Data.Bifunctor
-import Data.List
 
 import LogicExp.Core (LogicExp (..))
-import LogicExp.Priority
 import BaseExt
 
 data T =
@@ -31,15 +28,25 @@ data T =
     | TClose
     deriving (Show, Eq, Read)
 
+braces :: String
 braces = "()"
+trueChar :: String
 trueChar = "1tT"
+falseChar :: String
 falseChar = "0fF"
+andOp :: String
 andOp = "&^"
+orOp :: String
 orOp = "|vV"
+notOp :: String
 notOp = "-~"
+impOp :: String
 impOp = "=->"
+eqOp :: String
 eqOp = "<=->"
+xorOp :: String
 xorOp = "x+"
+reservedChar :: String
 reservedChar = concat [braces, trueChar, falseChar, andOp, orOp, notOp, impOp, eqOp, xorOp, " "]
 
 parse :: String -> Either String LogicExp
@@ -51,7 +58,7 @@ parse str = str |> tokenize |-> nest |-> parseN
 
 
 tokenize :: String -> Either String [T]
-tokenize s = first show $ P.parse (exps <* eof) [] $ filter (/=' ') s
+tokenize str = first show $ P.parse (exps <* eof) [] $ filter (/=' ') str
     where
         exps = many1 exp
         exp = try $ choice [true, false, and, or, imp, eq, xor, not, open, close, lit]
@@ -67,9 +74,11 @@ tokenize s = first show $ P.parse (exps <* eof) [] $ filter (/=' ') s
         open = try $ TOpen <$ char '('
         close = try $ TClose <$ char ')'
 
-        stringOneOf s = (:[]) <$> oneOf s
-        stringNoneOf s = (:[]) <$> noneOf s
-        --trim p = spaces *> p <* spaces
+stringOneOf :: Stream s m Char => String -> ParsecT s u m String
+stringOneOf s = (:[]) <$> oneOf s
+
+stringNoneOf :: Stream s m Char => String -> ParsecT s u m String
+stringNoneOf s = (:[]) <$> noneOf s
 
 data N = 
     NList [N] 
@@ -78,7 +87,7 @@ data N =
     | NBOp T deriving (Show, Eq, Read)
 
 nest :: [T] -> Either String N
-nest ts = case nestMany [] ts of
+nest tss = case nestMany [] tss of
         (ns, []) -> Right $ resolvePrio $ flatten $ NList ns
         x        -> Left $ "Could not nest everything: " ++ show x 
     where
@@ -110,6 +119,7 @@ parseN (NSymbol t) = case t of
     TLit c -> Right $ Lit c
     TT     -> Right T
     TF     -> Right F
+    r      -> error $ "Unexpected value for (NSymbol t): " ++ show r
 parseN (NList xs) = case xs of
     [a]                -> parseN a
     [NUOp TNot, a]     -> second  Not   (parseN a)
@@ -129,7 +139,6 @@ combine _ _         (Left r)  = Left r
 combine f (Right a) (Right b) = Right $ f a b
 
 resolvePrio :: N -> N
---resolvePrio x = error $ show x
 resolvePrio (NList []) = NList []
 resolvePrio (NList [x]) = NList [x]
 resolvePrio (NList xs) = flatten $ NList $ nestPrio xs
@@ -137,40 +146,41 @@ resolvePrio (NList xs) = flatten $ NList $ nestPrio xs
         nestPrio a = 
             a 
             |> nestNot 
-            -- |> (error . show)
             |> nestAnd
             |> nestOr
             |> nestXor
             |> nestImp
             |> nestEqual
-resolvePrio n = n --error $ show n
+resolvePrio n = n 
 
-
-p ? (t, e) = if p then t else e
 -- prio is not and or xor imp eq 
 
+nestRec :: ([N] -> [N]) -> N -> N
+nestRec f a = case a of
+    NList as -> flatten $ NList $ f as
+    r        -> r
+
 nestNot :: [N] -> [N]
+countNots :: (N -> N) -> [N] -> [N]
+nestAnd :: [N] -> [N]
+nestOr :: [N] -> [N]
+nestXor :: [N] -> [N]
+nestImp :: [N] -> [N]
+nestEqual :: [N] -> [N]
+
 nestNot [] = []
--- nestNot ns = b ? (nestNot ns', ns')
---     where
---         (ns', b) = nestNots (ns, False)
 nestNot ns = let
     ns' = nestRec nestNot <$> ns
     ns'' = countNots id ns'
     in
         ns''
 
-
-countNots :: (N -> N) -> [N] -> [N]
 countNots _ [] = []
 countNots f (NUOp TNot:ns) = countNots f' ns
     where
         f' n = f $ NList [NUOp TNot, n]
 countNots f (n:ns) = f n : countNots id ns
 
-nestRec f a = case a of
-    NList as -> flatten $ NList $ f as
-    r        -> r
 
 nestAnd [] = []
 nestAnd [a,NBOp TAnd,b]    = [NList [nestRec nestAnd a, NBOp TAnd, nestRec nestAnd b]]
@@ -196,7 +206,6 @@ nestXor (a:NBOp TXor:b:cs) = [NList $ nestXor $ NList [a',NBOp TXor,b'] : cs]
         b' = nestRec nestXor b
 nestXor (a:bs)             = nestRec nestXor a : nestXor bs
 
--- nestImp x = error $ show x 
 nestImp [] = [] 
 nestImp [a,NBOp TImp,b]    = [NList [nestRec nestImp a,NBOp TImp,nestRec nestImp b]]
 nestImp (a:NBOp TImp:b:cs) = [NList $ nestImp $ NList [a',NBOp TImp,b'] : cs]
