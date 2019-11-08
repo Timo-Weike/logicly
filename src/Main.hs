@@ -16,23 +16,28 @@ import LogicExp
 import LogicExp.Valuation
 import LogicExp.Eval
 import Text.Table
+import VersionInfo (printVersionInfo)
+
 
 data Configuration = C {
     showTable :: Bool,
     showHelp :: Bool,
     valuation :: Maybe Valuation,
     onlySat :: Bool,
-    onlyUnsat :: Bool
+    onlyUnsat :: Bool,
+    showVersion :: Bool
 } deriving (Show, Eq)
 
 emptyConfiguration :: Configuration
-emptyConfiguration = C False False Nothing False False
+emptyConfiguration = C False False Nothing False False False
 
 options :: [OptDescr (Configuration -> IO Configuration)]
 options = 
     [
         Option "h" ["help"] (NoArg setHelpFlag)
             "shows this help"
+    ,   Option "V" ["version"] (NoArg setShowVersion)
+            "print version information"
     ,   Option "t" ["table"] (NoArg setTableFlag)
             "prints a truth-table for the expression"
     ,   Option "e" ["eval"] (ReqArg setEvalFlag "VAL")
@@ -42,6 +47,9 @@ options =
     ,   Option []  ["only-unsat"] (NoArg setOnlyUnsatFlag)
             "the table will only contain the valuations which does not satisfies the expression"
     ]
+
+setShowVersion :: Configuration -> IO Configuration
+setShowVersion s = return $ s { showVersion = True }
 
 setTableFlag :: Configuration -> IO Configuration
 setTableFlag s = 
@@ -109,6 +117,8 @@ reportParseError expStr errStr = do
 main :: IO ()
 main = do
     (conf,expStr) <- parseArgs
+
+    when (showVersion conf) printVersionInfo
 
     case expStr of
         "" -> printHelp
