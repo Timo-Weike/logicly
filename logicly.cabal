@@ -25,7 +25,7 @@ category:
     CLI Tool
 build-type:             Simple
 extra-source-files:     CHANGELOG.md
-Homepage:               https://gitlab.com/Timo.Weike/logicly
+Homepage:               https://github.com/Timo-Weike/logicly
 
 flag static
     description:        Build a static binary.
@@ -34,7 +34,7 @@ flag static
 
 Source-Repository head
   type:                 git
-  location:             https://gitlab.com/Timo.Weike/logicly
+  location:             https://github.com/Timo-Weike/logicly
 
 test-suite test
     type:               exitcode-stdio-1.0
