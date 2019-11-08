@@ -1,9 +1,7 @@
--- {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Data.Either
 import Control.Monad
-import Data.Char
 import Data.List
 import System.Console.GetOpt
 import System.Environment
@@ -11,39 +9,35 @@ import System.Exit
 import System.IO
 import Text.Printf
 import Data.Functor
-import Control.Lens
 import Data.Maybe
-import Text.PrettyPrint.Boxes
+import Prelude hiding (exp)
 
-import BaseExt
 import LogicExp
 import LogicExp.Valuation
 import LogicExp.Eval
 import Text.Table
+import VersionInfo (printVersionInfo)
 
-data Flags =
-    Table
-    | Eval String
-    | Help
-    | OnlySat
-    | OnlyUnsat
-    deriving (Show, Read, Eq, Ord)
 
 data Configuration = C {
     showTable :: Bool,
     showHelp :: Bool,
     valuation :: Maybe Valuation,
     onlySat :: Bool,
-    onlyUnsat :: Bool
+    onlyUnsat :: Bool,
+    showVersion :: Bool
 } deriving (Show, Eq)
 
-emptyConfiguration = C False False Nothing False False
+emptyConfiguration :: Configuration
+emptyConfiguration = C False False Nothing False False False
 
 options :: [OptDescr (Configuration -> IO Configuration)]
 options = 
     [
         Option "h" ["help"] (NoArg setHelpFlag)
             "shows this help"
+    ,   Option "V" ["version"] (NoArg setShowVersion)
+            "print version information"
     ,   Option "t" ["table"] (NoArg setTableFlag)
             "prints a truth-table for the expression"
     ,   Option "e" ["eval"] (ReqArg setEvalFlag "VAL")
@@ -53,6 +47,9 @@ options =
     ,   Option []  ["only-unsat"] (NoArg setOnlyUnsatFlag)
             "the table will only contain the valuations which does not satisfies the expression"
     ]
+
+setShowVersion :: Configuration -> IO Configuration
+setShowVersion s = return $ s { showVersion = True }
 
 setTableFlag :: Configuration -> IO Configuration
 setTableFlag s = 
@@ -69,14 +66,14 @@ setHelpFlag s =
         return $ s { showHelp = True }
 
 setEvalFlag :: String ->  Configuration -> IO Configuration
-setEvalFlag arg s = 
-    if isJust $ valuation s then
+setEvalFlag arg config = 
+    if isJust $ valuation config then
         reportError "cannot handle multiple valuations"
     else do
         val <- case parseValuation arg of
                 Left s -> reportError s
                 Right v -> pure v
-        return $ s { valuation = Just val }
+        return $ config { valuation = Just val }
 
 
 setOnlySatFlag :: Configuration -> IO Configuration
@@ -93,29 +90,23 @@ setOnlyUnsatFlag s =
     else
         return $ s { onlyUnsat = True }
 
-areArgsValid args = True
-
 parseArgs :: IO (Configuration, String)
 parseArgs = do
     args <- getArgs
 
     -- Parse options, getting a list of option actions
     case getOpt RequireOrder options args of
-        (args,exps,[]) -> do
+        (config,exps,[]) -> do
             -- Here we thread startOptions through all supplied option actions
-            opts <- foldl (>>=) (return emptyConfiguration) args 
+            opts <- foldl (>>=) (return emptyConfiguration) config 
             return (opts, concat exps)
         
-        (_,_,err) -> do
-            reportError $ concat err
-            return $ error ""
+        (_,_,err) -> reportError $ concat err
                 
 reportError :: String -> IO a
 reportError s = do
     hPutStrLn stderr (s ++ "\n" ++ usageInfo header options)
     exitWith (ExitFailure 1)
-            
-header = "Usage: logic-tool [-the] EXP\n"
 
 reportParseError :: String -> String -> IO ()
 reportParseError expStr errStr = do
@@ -127,13 +118,18 @@ main :: IO ()
 main = do
     (conf,expStr) <- parseArgs
 
-    let mayExp = parse expStr
+    when (showVersion conf) printVersionInfo
 
-    case mayExp of
-        Left s -> reportParseError expStr s
-        Right exp -> handleCorrectExp conf exp
+    case expStr of
+        "" -> printHelp
+        r -> do 
+                let mayExp = parse r
 
-    exitSuccess
+                case mayExp of
+                    Left s -> reportParseError expStr s
+                    Right exp -> handleCorrectExp conf exp
+
+                exitSuccess
 
 handleCorrectExp :: Configuration -> LogicExp -> IO ()
 handleCorrectExp conf exp = 
@@ -142,9 +138,7 @@ handleCorrectExp conf exp =
         let doTable = showTable conf
         let doEval = isJust $ valuation conf
 
-        when showHelp' $ do
-            hPutStrLn stderr (usageInfo header options)
-            exitSuccess
+        when showHelp' printHelp
 
         when doTable $ handleTable conf exp
         when doEval $ handleEval conf exp
@@ -193,3 +187,44 @@ handleEval conf exp = do
 boolToString :: Bool -> String
 boolToString True  = "1"
 boolToString False = "0"
+
+printHelp :: IO a
+printHelp = do 
+                hPutStrLn stderr (usageInfo header options ++ body)
+                exitSuccess
+
+header :: String
+header = "Usage: logic-tool [-the] [EXP]\n"
+
+body :: String
+body = intercalate "\n" 
+    [
+          ""
+        , "Expression syntax:"
+        , "    • '~', '-' - the not operation"
+        , "    • '&', 'and', '^' - the and operation"
+        , "    • '|', 'or', 'v' - the or operation"
+        , "    • 'x', '+', 'xor' - the xor operation (i.e. (a xor b) is ((~a and b) or (a and ~b))" 
+        , "    • '->', '=>', - the implication (i.e. (a -> b) is (~a or b))"
+        , "    • '<->', '<=>' - the equality operation (i.e. (a <-> b) is ((a and b) or (~a and ~b))"
+        , ""
+        , "Also the sub expressions can be surrunded with '(' and ')' to make the order of operations"
+        , "explicit. The standard precedence of the operation is:"
+        , "    not, and, or, xor, ->, <->"
+
+        , "If the programm get an expression without any further flags set, it will just print the"
+        , "expression back to the stdout. The expression and all of its sub expression will be"
+        , "surrunded by brackets and using the standard symbol for the operations (first in the list)."
+        , "This is useful for error detection in the expression."
+        , ""
+        , "Literal can be any character, as long they do not interfer with the charakter reserved for"
+        , "the operations."
+        , "Examples:"
+        , "    'logicly \"a & x\"' is not valid because 'x' will be interpreted as xor, but"
+        , "    'logicly \"a and b\" is fine because the 'a' can't be mistaken for an operation"
+        , "    and the 'and' can't be mistaken for a list of literals"
+        , ""
+        , "The valuation for the flag 'e' has to be of the form:"
+        , "    <lit>:(0|1)(,<lit>:(0|1))*"
+        , "so for example the call 'logicly -e \"a:0,b:1\" \"a and b\" would generate: False"
+    ]
