@@ -11,7 +11,6 @@ import System.Exit
 import System.IO
 import Text.Printf
 import Data.Functor
-import Control.Lens
 import Data.Maybe
 import Text.PrettyPrint.Boxes
 
@@ -114,8 +113,6 @@ reportError :: String -> IO a
 reportError s = do
     hPutStrLn stderr (s ++ "\n" ++ usageInfo header options)
     exitWith (ExitFailure 1)
-            
-header = "Usage: logic-tool [-the] EXP\n"
 
 reportParseError :: String -> String -> IO ()
 reportParseError expStr errStr = do
@@ -127,13 +124,16 @@ main :: IO ()
 main = do
     (conf,expStr) <- parseArgs
 
-    let mayExp = parse expStr
+    case expStr of
+        "" -> printHelp
+        r -> do 
+                let mayExp = parse r
 
-    case mayExp of
-        Left s -> reportParseError expStr s
-        Right exp -> handleCorrectExp conf exp
+                case mayExp of
+                    Left s -> reportParseError expStr s
+                    Right exp -> handleCorrectExp conf exp
 
-    exitSuccess
+                exitSuccess
 
 handleCorrectExp :: Configuration -> LogicExp -> IO ()
 handleCorrectExp conf exp = 
@@ -142,9 +142,7 @@ handleCorrectExp conf exp =
         let doTable = showTable conf
         let doEval = isJust $ valuation conf
 
-        when showHelp' $ do
-            hPutStrLn stderr (usageInfo header options)
-            exitSuccess
+        when showHelp' printHelp
 
         when doTable $ handleTable conf exp
         when doEval $ handleEval conf exp
@@ -193,3 +191,40 @@ handleEval conf exp = do
 boolToString :: Bool -> String
 boolToString True  = "1"
 boolToString False = "0"
+
+printHelp :: IO a
+printHelp = do 
+                hPutStrLn stderr (usageInfo header options ++ body)
+                exitSuccess
+
+header :: String
+header = "Usage: logic-tool [-the] [EXP]\n"
+
+body :: String
+body = unlines 
+    [
+          ""
+        , "Expression syntax:"
+        , "    • '~', '-' - the not operation"
+        , "    • '&', 'and', '^' - the and operation"
+        , "    • '|', 'or', 'v' - the or operation"
+        , "    • 'x', '+', 'xor' - the xor operation (i.e. (a xor b) is ((~a and b) or (a and ~b))" 
+        , "    • '->', '=>', - the implication (i.e. (a -> b) is (~a or b))"
+        , "    • '<->', '<=>' - the equality operation (i.e. (a <-> b) is ((a and b) or (~a and ~b))"
+        , ""
+        , "Also the sub expressions can be surrunded with '(' and ')' to make the order of operations"
+        , "explicit. The standard precedence of the operation is:"
+        , "    not, and, or, xor, ->, <->"
+
+        , "If the programm get an expression without any further flags set, it will just print the"
+        , "expression back to the stdout. The expression and all of its sub expression will be"
+        , "surrunded by brackets and using the standard symbol for the operations (first in the list)."
+        , "This is useful for error detection in the expression."
+        , ""
+        , "Literal can be any character, as long they do not interfer with the charakter reserved for"
+        , "the operations."
+        , "Examples:"
+        , "    'logicly \"a & x\"' is not valid because 'x' will be interpreted as xor, but"
+        , "    'logicly \"a and b\" is fine because the 'a' can't be mistaken for an operation"
+        , "    and the 'and' can't be mistaken for a list of literals"
+    ]
