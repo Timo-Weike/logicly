@@ -1,6 +1,6 @@
 # logicly
 
-`logicly` is command line tool intended to make is easier to work with logical expressions.
+`logicly` is command line tool intended to make it easier to work with logical expressions.
 One can use `logicly` to create a truth-table for a logic expression.
 If you run the command `logicly -t "a | b -> b & c"`, `logicly` will produce the following output:
 ~~~
@@ -25,3 +25,9 @@ Since for expession with many different atomic formulas the truth-table gets big
  The valuation has to be in the form of `<lit>:(0|1)(,<lit>:(0|1))*` where `<lit>` is an literal.
 
  For further details on the api and the syntac refer to the help produced by the flag `-h`
+ 
+ ## Possibly comming Features
+ 
+ * simplification of expessions (simplification goals could be some normal for like [CNF](https://en.wikipedia.org/wiki/Conjunctive_normal_form) or [DNF](https://en.wikipedia.org/wiki/Disjunctive_normal_form), or it could be simplified to use the least amount of operations (this could be usefull for optimizing conditions for loops and if-statements))
+ 
+ * printing a list of all partial expressions
